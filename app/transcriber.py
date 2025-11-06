@@ -140,8 +140,7 @@ async def summarize_with_gemini(transcript: str, task_id: int, filename: str = "
     
     # Combined prompt for info extraction
     prompt = (
-        "請根據以下演講稿進行分析，並以繁體中文回答：\n\n"
-        f"{filename_context}"
+        "請根據以下"f"{filename}""的演講稿進行分析，並以繁體中文回答：\n\n"
         "1. 回答以下問題並以 a, b, c 格式列點：\n"
         "   a. 講者是否為安利的領袖？(回答：是/否)\n"
         "   b. 講者的名字 (若未提及，則回答：未提及)\n"
