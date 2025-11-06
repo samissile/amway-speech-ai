@@ -21,7 +21,9 @@ load_dotenv()
 app = FastAPI(title="Amway Speech AI")
 
 # === CONFIG: Load API key from environment ===
-VALID_API_KEY = os.getenv("VALID_API_KEY", "amway-secret-2025")  # Fallback for dev
+VALID_API_KEY = os.getenv("VALID_API_KEY")
+if not VALID_API_KEY:
+    raise ValueError("❌ VALID_API_KEY not set in .env")
 
 # Get the absolute path to the static directory
 STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')

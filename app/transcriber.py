@@ -15,11 +15,15 @@ load_dotenv()
 
 # === CONFIG ===
 API_ENDPOINT = "https://api.laozhang.ai/v1/audio/transcriptions"
-API_AUTH_HEADER = os.getenv("API_AUTH_HEADER", "Bearer sk-K1NyR1iYu9AZmFfI62301dE72c544368Ad847931C21c8d48")  # Fallback for dev
+API_AUTH_HEADER = os.getenv("API_AUTH_HEADER")
+if not API_AUTH_HEADER:
+    raise ValueError("❌ API_AUTH_HEADER not set in .env")
 API_MODEL = "gpt-4o-transcribe"
 SEGMENT_MS = 5 * 60 * 1000  # 5 minutes
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyDU1PTYA6tpGQVStL_zA42vXY0b1k0Ysgg")  # Fallback for dev
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise ValueError("❌ GEMINI_API_KEY not set in .env")
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
 async def safe_load_audio(file_bytes: bytes, filename: str) -> AudioSegment:
