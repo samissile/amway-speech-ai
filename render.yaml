@@ -6,8 +6,8 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: VALID_API_KEY
-        fromEnv: VALID_API_KEY
+        scope: run
       - key: API_AUTH_HEADER
-        fromEnv: API_AUTH_HEADER
+        scope: run
       - key: GEMINI_API_KEY
-        fromEnv: GEMINI_API_KEY
+        scope: run
