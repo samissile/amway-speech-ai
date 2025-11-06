@@ -66,8 +66,17 @@ async def auth(api_key: str = Depends(verify_api_key_form)):
     return RedirectResponse(url=f"/?api_key={api_key}")
 
 # === Home: Status page, requires api_key query ===
+# === Home: Redirect to login if no API key ===
 @app.get("/", response_class=HTMLResponse)
-async def home(request: Request, api_key: str = Depends(verify_api_key)):
+async def home(request: Request, api_key: str = Query(None)):
+    if not api_key:
+        return RedirectResponse(url="/login")
+    
+    try:
+        await verify_api_key(api_key)
+    except HTTPException:
+        return RedirectResponse(url="/login")
+    
     logger.debug(f"Accessing home with api_key: {api_key}")
     tasks = await get_tasks_for_key(api_key)
     return templates.TemplateResponse("status.html", {"request": request, "tasks": tasks, "api_key": api_key})
