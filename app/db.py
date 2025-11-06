@@ -20,33 +20,38 @@ class Task:
 
 async def init_db():
     async with aiosqlite.connect(DB_FILE) as db:
-        # Check if new columns exist
+        # Create table if it doesn't exist
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                api_key TEXT NOT NULL,
+                status TEXT NOT NULL,
+                progress INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                file_size INTEGER DEFAULT 0,
+                audio_duration INTEGER DEFAULT 0,
+                result TEXT,
+                error TEXT
+            )
+        """)
+        await db.commit()
+        
+        # Check if new columns exist (for migration)
         cursor = await db.execute("PRAGMA table_info(tasks)")
         columns = await cursor.fetchall()
         column_names = [col[1] for col in columns]
         
+        # Add columns if they don't exist
         if "file_size" not in column_names:
             print("🔄 Migrating database schema...")
             await db.execute("ALTER TABLE tasks ADD COLUMN file_size INTEGER DEFAULT 0")
+            await db.commit()
+        
+        if "audio_duration" not in column_names:
             await db.execute("ALTER TABLE tasks ADD COLUMN audio_duration INTEGER DEFAULT 0")
             await db.commit()
             print("✅ Migration complete!")
-        else:
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS tasks (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    api_key TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    progress INTEGER NOT NULL,
-                    filename TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    file_size INTEGER DEFAULT 0,
-                    audio_duration INTEGER DEFAULT 0,
-                    result TEXT,
-                    error TEXT
-                )
-            """)
-            await db.commit()
 
 async def create_task(api_key: str, filename: str, file_size: int = 0, audio_duration: int = 0) -> int:
     async with aiosqlite.connect(DB_FILE) as db:
