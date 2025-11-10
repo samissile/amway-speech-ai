@@ -1,11 +1,12 @@
+# .gitignore
 __pycache__/
 *.pyc
+.git
 .env
-.env.local
-.env.*.local
+*.log
+*.sqlite
 tasks.db
-*.db
-.DS_Store
-venv/
-.vscode/
-.idea/
+
+# Ignore result files but keep folder
+app/results/*
+!app/results/.gitkeep

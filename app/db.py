@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Optional, List
 from datetime import datetime, timedelta
 
-DB_FILE = "app/tasks.db"
+DB_FILE = "app/db/tasks.db"
 
 @dataclass
 class Task:
@@ -16,7 +16,7 @@ class Task:
     created_at: str
     file_size: int = 0
     audio_duration: int = 0
-    result: Optional[str] = None
+    result_file: Optional[str] = None  # ✅ CHANGED: Store file path instead of content
     error: Optional[str] = None
 
 async def init_db():
@@ -32,7 +32,7 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 file_size INTEGER DEFAULT 0,
                 audio_duration INTEGER DEFAULT 0,
-                result TEXT,
+                result_file TEXT,
                 error TEXT
             )
         """)
@@ -52,7 +52,16 @@ async def init_db():
         if "audio_duration" not in column_names:
             await db.execute("ALTER TABLE tasks ADD COLUMN audio_duration INTEGER DEFAULT 0")
             await db.commit()
+        
+        # ✅ NEW: Migrate from 'result' to 'result_file'
+        if "result_file" not in column_names and "result" in column_names:
+            print("🔄 Migrating to file-based results...")
+            await db.execute("ALTER TABLE tasks ADD COLUMN result_file TEXT")
+            await db.commit()
             print("✅ Migration complete!")
+        elif "result_file" not in column_names:
+            await db.execute("ALTER TABLE tasks ADD COLUMN result_file TEXT")
+            await db.commit()
 
 async def create_task(api_key: str, filename: str, file_size: int = 0, audio_duration: int = 0) -> int:
     async with aiosqlite.connect(DB_FILE) as db:
@@ -63,7 +72,10 @@ async def create_task(api_key: str, filename: str, file_size: int = 0, audio_dur
         await db.commit()
         return cursor.lastrowid
 
-async def update_task(task_id: int, status: Optional[str] = None, progress: Optional[int] = None, result: Optional[str] = None, error: Optional[str] = None):
+async def update_task(task_id: int, status: Optional[str] = None, progress: Optional[int] = None, result_file: Optional[str] = None, error: Optional[str] = None):
+    """
+    ✅ CHANGED: result_file instead of result
+    """
     async with aiosqlite.connect(DB_FILE) as db:
         updates = []
         params = []
@@ -73,9 +85,9 @@ async def update_task(task_id: int, status: Optional[str] = None, progress: Opti
         if progress is not None:
             updates.append("progress = ?")
             params.append(progress)
-        if result is not None:
-            updates.append("result = ?")
-            params.append(result)
+        if result_file is not None:
+            updates.append("result_file = ?")
+            params.append(result_file)
         if error is not None:
             updates.append("error = ?")
             params.append(error)
@@ -89,7 +101,7 @@ async def update_task(task_id: int, status: Optional[str] = None, progress: Opti
 async def get_task(task_id: int) -> Optional[Task]:
     async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute(
-            "SELECT id, api_key, status, progress, filename, created_at, file_size, audio_duration, result, error FROM tasks WHERE id = ?",
+            "SELECT id, api_key, status, progress, filename, created_at, file_size, audio_duration, result_file, error FROM tasks WHERE id = ?",
             (task_id,)
         )
         row = await cursor.fetchone()
@@ -100,7 +112,7 @@ async def get_task(task_id: int) -> Optional[Task]:
 async def get_tasks_for_key(api_key: str) -> List[Task]:
     async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute(
-            "SELECT id, api_key, status, progress, filename, created_at, file_size, audio_duration, result, error FROM tasks WHERE api_key = ? ORDER BY created_at DESC",
+            "SELECT id, api_key, status, progress, filename, created_at, file_size, audio_duration, result_file, error FROM tasks WHERE api_key = ? ORDER BY created_at DESC",
             (api_key,)
         )
         rows = await cursor.fetchall()
