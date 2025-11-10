@@ -1,11 +1,30 @@
-FROM python:3.11.7-slim
+FROM python:3.11-alpine
 
-RUN apt-get update && apt-get install -y ffmpeg libavcodec-extra sqlite3 && rm -rf /var/lib/apt/lists/*
+# Install system dependencies
+RUN apk add --no-cache \
+    ffmpeg \
+    sqlite \
+    gcc \
+    musl-dev \
+    linux-headers \
+    && rm -rf /var/cache/apk/*
 
 WORKDIR /app
+
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy application
 COPY . .
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Create temp directories
+RUN mkdir -p /tmp/audio_uploads /tmp/segments
+
+# Run with single worker and memory limits
+CMD ["uvicorn", "app.main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8080", \
+     "--workers", "1", \
+     "--limit-concurrency", "5", \
+     "--timeout-keep-alive", "30"]

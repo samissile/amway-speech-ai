@@ -2,8 +2,9 @@
 import aiosqlite
 from dataclasses import dataclass
 from typing import Optional, List
+from datetime import datetime, timedelta
 
-DB_FILE = "tasks.db"
+DB_FILE = "app/tasks.db"
 
 @dataclass
 class Task:
@@ -13,8 +14,8 @@ class Task:
     progress: int
     filename: str
     created_at: str
-    file_size: int = 0  # ✅ NEW
-    audio_duration: int = 0  # ✅ NEW (in seconds)
+    file_size: int = 0
+    audio_duration: int = 0
     result: Optional[str] = None
     error: Optional[str] = None
 
@@ -104,3 +105,19 @@ async def get_tasks_for_key(api_key: str) -> List[Task]:
         )
         rows = await cursor.fetchall()
         return [Task(*row) for row in rows]
+
+async def cleanup_old_tasks(days_old: int = 7):
+    """Delete tasks older than N days to save memory"""
+    async with aiosqlite.connect(DB_FILE) as db:
+        cursor = await db.execute(
+            "DELETE FROM tasks WHERE created_at < datetime('now', '-' || ? || ' days')",
+            (days_old,)
+        )
+        await db.commit()
+        deleted_count = cursor.rowcount
+        if deleted_count > 0:
+            print(f"🧹 Cleaned up {deleted_count} old tasks")
+        
+        # Vacuum to reclaim space
+        await db.execute("VACUUM")
+        await db.commit()
