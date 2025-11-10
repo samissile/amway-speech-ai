@@ -156,7 +156,7 @@ async def transcribe_audio_file_streaming(file_path: str, filename: str, task_id
                 result_json = resp.json()
                 text = result_json.get('text', f"[EMPTY SEGMENT {i+1}]")
                 full_text.append(
-                    f"=== SEGMENT {i+1} ({start_sec/60:.1f}-{end_sec/60:.1f}min ===\n{text}"
+                    f"=== SEGMENT {i+1} ({start_sec/60:.1f}-{end_sec/60:.1f}min) ===\n{text}"
                 )
                 
                 logger.info(f"✅ Segment {i+1} transcribed successfully")
