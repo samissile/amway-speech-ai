@@ -22,7 +22,16 @@ async def extract_title_only(url: str) -> str:
             'no_warnings': True,
             'extract_flat': False,
             'socket_timeout': 15,
-            'skip_download': True,  # Don't download, just get info
+            'skip_download': True,
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['web'],
+                    'player_skip': ['js', 'configs'],
+                }
+            },
         }
         
         loop = asyncio.get_event_loop()
@@ -54,7 +63,8 @@ async def download_audio_from_url(url: str, task_id: int) -> Tuple[str, str, int
     output_template = os.path.join(YT_DOWNLOAD_DIR, f"yt_{task_id}_%(title)s.%(ext)s")
     
     ydl_opts = {
-        'format': 'bestaudio/best',
+        # ✅ FIXED: Use format that works with SABR videos
+        'format': 'bestaudio[ext=m4a]/bestaudio/best',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -68,13 +78,27 @@ async def download_audio_from_url(url: str, task_id: int) -> Tuple[str, str, int
         'socket_timeout': 30,
         'postprocessor_args': [
             '-ar', '44100',
-            '-ac', '1',      # Mono
-            '-b:a', '128k',  # 128kbps bitrate
-            '-q:a', '4',     # Quality
+            '-ac', '1',
+            '-b:a', '128k',
+            '-q:a', '4',
         ],
         'prefer_ffmpeg': True,
         'keepvideo': False,
         'progress_hooks': [],
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+        },
+        # ✅ FIXED: Use android client which doesn't require SABR decryption
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android'],  # Changed from 'web' to 'android'
+                'player_skip': ['js', 'configs'],
+            }
+        },
+        'retries': 5,  # Increased retries
+        'fragment_retries': 5,
+        'skip_unavailable_fragments': True,  # Skip unavailable fragments
     }
     
     try:
@@ -128,6 +152,14 @@ def validate_video_url(url: str) -> bool:
             'no_warnings': True,
             'extract_flat': True,
             'socket_timeout': 10,
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android'],
+                }
+            },
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
