@@ -6,6 +6,7 @@ __pycache__/
 *.log
 *.sqlite
 tasks.db
+Dockerfile_backup
 
 # Ignore result files but keep folder
 app/results/*
