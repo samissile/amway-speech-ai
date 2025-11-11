@@ -25,11 +25,6 @@ async def extract_title_only(url: str) -> str:
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             },
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['web'],  # Try web first for title extraction
-                }
-            },
         }
         
         loop = asyncio.get_event_loop()
@@ -60,9 +55,10 @@ async def download_audio_from_url(url: str, task_id: int) -> Tuple[str, str, int
     """
     output_template = os.path.join(YT_DOWNLOAD_DIR, f"yt_{task_id}_%(title)s.%(ext)s")
     
+    # ✅ FIXED: Use comprehensive options to handle SABR and other restrictions
     ydl_opts = {
-        # ✅ FIXED: Try multiple formats in order
-        'format': 'best[ext=mp4]/best[ext=webm]/best',
+        # Try all available formats
+        'format': 'best',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -73,7 +69,7 @@ async def download_audio_from_url(url: str, task_id: int) -> Tuple[str, str, int
         'quiet': False,
         'no_warnings': False,
         'extract_flat': False,
-        'socket_timeout': 60,  # Increased timeout
+        'socket_timeout': 60,
         'postprocessor_args': [
             '-ar', '44100',
             '-ac', '1',
@@ -87,18 +83,22 @@ async def download_audio_from_url(url: str, task_id: int) -> Tuple[str, str, int
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept-Language': 'en-US,en;q=0.9',
         },
-        # ✅ FIXED: Use web client which has better fallback support
+        # ✅ FIXED: Use multiple player clients as fallback
         'extractor_args': {
             'youtube': {
-                'player_client': ['web'],
-                'player_skip': ['js', 'configs'],
+                'player_client': ['web', 'android'],  # Try web first, then android
+                'player_skip': ['js'],  # Skip JS player
             }
         },
-        'retries': 10,  # More retries
-        'fragment_retries': 10,
+        'retries': 15,
+        'fragment_retries': 15,
         'skip_unavailable_fragments': True,
-        'ignore_errors': False,  # Don't ignore errors
-        'no_check_certificate': True,  # Skip SSL verification if needed
+        'ignore_errors': False,
+        'no_check_certificate': True,
+        # ✅ NEW: Allow unplayable formats as fallback
+        'allow_unplayable_formats': True,
+        # ✅ NEW: Use IPv4 to avoid IPv6 issues
+        'socket_family': 4,
     }
     
     try:
@@ -122,10 +122,20 @@ async def download_audio_from_url(url: str, task_id: int) -> Tuple[str, str, int
         
         logger.info(f"📺 Title: {title}, Duration: {duration}s")
         
-        # Find the downloaded file
+        # Find the downloaded file (handle Chinese characters in filename)
         import glob
         pattern = os.path.join(YT_DOWNLOAD_DIR, f"yt_{task_id}_*.mp3")
         files = glob.glob(pattern)
+        
+        if not files:
+            # If no mp3 found, look for any audio file
+            pattern = os.path.join(YT_DOWNLOAD_DIR, f"yt_{task_id}_*")
+            files = glob.glob(pattern)
+            if files:
+                # Filter for audio files only
+                audio_files = [f for f in files if f.endswith(('.mp3', '.m4a', '.wav', '.aac'))]
+                if audio_files:
+                    files = audio_files
         
         if not files:
             raise FileNotFoundError(f"Downloaded file not found for pattern: {pattern}")
