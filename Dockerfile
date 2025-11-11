@@ -96,7 +96,8 @@ exec uvicorn app.main:app \
     --timeout-keep-alive 30
 EOF
 
-chmod +x /app/start.sh
+# ✅ FIXED: Use RUN before chmod
+RUN chmod +x /app/start.sh
 
 EXPOSE 8080
 
