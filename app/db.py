@@ -16,12 +16,13 @@ class Task:
     created_at: str
     file_size: int = 0
     audio_duration: int = 0
-    result_file: Optional[str] = None  # ✅ CHANGED: Store file path instead of content
+    result_file: Optional[str] = None
     error: Optional[str] = None
+    source_type: str = "upload"
+    source_url: Optional[str] = None
 
 async def init_db():
     async with aiosqlite.connect(DB_FILE) as db:
-        # Create table if it doesn't exist
         await db.execute("""
             CREATE TABLE IF NOT EXISTS tasks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,17 +34,19 @@ async def init_db():
                 file_size INTEGER DEFAULT 0,
                 audio_duration INTEGER DEFAULT 0,
                 result_file TEXT,
-                error TEXT
+                error TEXT,
+                source_type TEXT DEFAULT 'upload',
+                source_url TEXT
             )
         """)
         await db.commit()
         
-        # Check if new columns exist (for migration)
+        # Check for migration
         cursor = await db.execute("PRAGMA table_info(tasks)")
         columns = await cursor.fetchall()
         column_names = [col[1] for col in columns]
         
-        # Add columns if they don't exist
+        # Add missing columns
         if "file_size" not in column_names:
             print("🔄 Migrating database schema...")
             await db.execute("ALTER TABLE tasks ADD COLUMN file_size INTEGER DEFAULT 0")
@@ -53,32 +56,55 @@ async def init_db():
             await db.execute("ALTER TABLE tasks ADD COLUMN audio_duration INTEGER DEFAULT 0")
             await db.commit()
         
-        # ✅ NEW: Migrate from 'result' to 'result_file'
-        if "result_file" not in column_names and "result" in column_names:
-            print("🔄 Migrating to file-based results...")
+        if "result_file" not in column_names:
             await db.execute("ALTER TABLE tasks ADD COLUMN result_file TEXT")
+            await db.commit()
+        
+        if "source_type" not in column_names:
+            print("🔄 Adding source_type column...")
+            await db.execute("ALTER TABLE tasks ADD COLUMN source_type TEXT DEFAULT 'upload'")
+            await db.commit()
+        
+        if "source_url" not in column_names:
+            print("🔄 Adding source_url column...")
+            await db.execute("ALTER TABLE tasks ADD COLUMN source_url TEXT")
             await db.commit()
             print("✅ Migration complete!")
-        elif "result_file" not in column_names:
-            await db.execute("ALTER TABLE tasks ADD COLUMN result_file TEXT")
-            await db.commit()
 
-async def create_task(api_key: str, filename: str, file_size: int = 0, audio_duration: int = 0) -> int:
+async def create_task(
+    api_key: str, 
+    filename: str, 
+    file_size: int = 0, 
+    audio_duration: int = 0,
+    source_type: str = "upload",
+    source_url: Optional[str] = None
+) -> int:
+    """Create a new task"""
     async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute(
-            "INSERT INTO tasks (api_key, status, progress, filename, created_at, file_size, audio_duration) VALUES (?, 'pending', 0, ?, CURRENT_TIMESTAMP, ?, ?)",
-            (api_key, filename, file_size, audio_duration)
+            """INSERT INTO tasks 
+            (api_key, status, progress, filename, created_at, file_size, audio_duration, source_type, source_url) 
+            VALUES (?, 'pending', 0, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?)""",
+            (api_key, filename, file_size, audio_duration, source_type, source_url)
         )
         await db.commit()
         return cursor.lastrowid
 
-async def update_task(task_id: int, status: Optional[str] = None, progress: Optional[int] = None, result_file: Optional[str] = None, error: Optional[str] = None):
-    """
-    ✅ CHANGED: result_file instead of result
-    """
+async def update_task(
+    task_id: int, 
+    status: Optional[str] = None, 
+    progress: Optional[int] = None, 
+    result_file: Optional[str] = None, 
+    error: Optional[str] = None,
+    file_size: Optional[int] = None,
+    audio_duration: Optional[int] = None,
+    filename: Optional[str] = None
+):
+    """Update task fields"""
     async with aiosqlite.connect(DB_FILE) as db:
         updates = []
         params = []
+        
         if status is not None:
             updates.append("status = ?")
             params.append(status)
@@ -91,6 +117,15 @@ async def update_task(task_id: int, status: Optional[str] = None, progress: Opti
         if error is not None:
             updates.append("error = ?")
             params.append(error)
+        if file_size is not None:
+            updates.append("file_size = ?")
+            params.append(file_size)
+        if audio_duration is not None:
+            updates.append("audio_duration = ?")
+            params.append(audio_duration)
+        if filename is not None:
+            updates.append("filename = ?")
+            params.append(filename)
         
         if updates:
             query = f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?"
@@ -101,7 +136,9 @@ async def update_task(task_id: int, status: Optional[str] = None, progress: Opti
 async def get_task(task_id: int) -> Optional[Task]:
     async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute(
-            "SELECT id, api_key, status, progress, filename, created_at, file_size, audio_duration, result_file, error FROM tasks WHERE id = ?",
+            """SELECT id, api_key, status, progress, filename, created_at, 
+                      file_size, audio_duration, result_file, error, source_type, source_url 
+               FROM tasks WHERE id = ?""",
             (task_id,)
         )
         row = await cursor.fetchone()
@@ -110,16 +147,19 @@ async def get_task(task_id: int) -> Optional[Task]:
         return None
 
 async def get_tasks_for_key(api_key: str) -> List[Task]:
+    """Get all tasks for a specific API key"""
     async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute(
-            "SELECT id, api_key, status, progress, filename, created_at, file_size, audio_duration, result_file, error FROM tasks WHERE api_key = ? ORDER BY created_at DESC",
+            """SELECT id, api_key, status, progress, filename, created_at, 
+                      file_size, audio_duration, result_file, error, source_type, source_url 
+               FROM tasks WHERE api_key = ? ORDER BY created_at DESC""",
             (api_key,)
         )
         rows = await cursor.fetchall()
         return [Task(*row) for row in rows]
 
-async def cleanup_old_tasks(days_old: int = 7):
-    """Delete tasks older than N days to save memory"""
+async def cleanup_old_tasks(days_old: int = 10):
+    """Delete tasks older than N days"""
     async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute(
             "DELETE FROM tasks WHERE created_at < datetime('now', '-' || ? || ' days')",
@@ -130,6 +170,5 @@ async def cleanup_old_tasks(days_old: int = 7):
         if deleted_count > 0:
             print(f"🧹 Cleaned up {deleted_count} old tasks")
         
-        # Vacuum to reclaim space
         await db.execute("VACUUM")
         await db.commit()
