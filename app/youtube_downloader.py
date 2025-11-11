@@ -101,7 +101,7 @@ async def download_audio_from_url(url: str, task_id: int) -> Tuple[str, str, int
         # ✅ NEW: Use IPv4 to avoid IPv6 issues
         'socket_family': 4,
         'geo_bypass': True,
-        'geo_bypass_country': 'US',
+        'geo_bypass_country': 'SG',
     }
     
     try:
@@ -169,7 +169,7 @@ def validate_video_url(url: str) -> bool:
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             },
             'geo_bypass': True,
-            'geo_bypass_country': 'US',
+            'geo_bypass_country': 'SG',
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
