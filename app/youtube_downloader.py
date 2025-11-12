@@ -98,10 +98,6 @@ async def download_audio_from_url(url: str, task_id: int) -> Tuple[str, str, int
         'no_check_certificate': True,
         # ✅ NEW: Allow unplayable formats as fallback
         'allow_unplayable_formats': True,
-        # ✅ NEW: Use IPv4 to avoid IPv6 issues
-        'socket_family': 4,
-        'geo_bypass': True,
-        'geo_bypass_country': 'SG',
     }
     
     try:
@@ -168,8 +164,6 @@ def validate_video_url(url: str) -> bool:
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             },
-            'geo_bypass': True,
-            'geo_bypass_country': 'SG',
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
