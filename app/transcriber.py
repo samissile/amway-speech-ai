@@ -167,7 +167,7 @@ async def transcribe_audio_file_streaming(
                 
                 if text:
                     full_text.append(
-                        f"=== 片段 {i+1} ({start_sec/60:.1f}-{end_sec/60:.1f}分鐘) ===\n{text}"
+                        f"\n{text}"
                     )
                 
                 # Immediate cleanup
@@ -237,7 +237,7 @@ async def summarize_with_gemini(
         "   a. 講者是否為安利的領袖？(回答：是/否)\n"
         f"   b. 講者的名字 (若{filename}和演講稿未提及，則回答：未提及)\n"
         f"   c. 演講的主題 (若{filename}和演講稿未提及，則回答：未提及)\n"
-        "2. 請詳細歸納演講內容，包含主要觀點，故事，比喻，以及金句。\n"
+        "2. 請詳細歸納演講內容，提供結構化的總結，包含主題和主要觀點。\n"
         f"演講稿:\n{transcript}"
     )
     
