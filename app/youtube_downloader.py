@@ -50,54 +50,40 @@ async def extract_title_only(url: str) -> str:
 async def download_audio_from_url(url: str, task_id: int) -> Tuple[str, str, int]:
     """
     Download audio from YouTube/video URL using yt-dlp
-    Mono 128kbps MP3 format
+    Mono 96kbps MP3 format (Optimized for Speech AI)
     Returns: (file_path, title, duration_seconds)
     """
     output_template = os.path.join(YT_DOWNLOAD_DIR, f"yt_{task_id}_%(title)s.%(ext)s")
     
-    # ✅ FIXED: Use comprehensive options to handle SABR and other restrictions
     ydl_opts = {
-        # Try all available formats
-        'format': 'best',
+        'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
-            'preferredquality': '128',
+            'preferredquality': '96',
             'nopostoverwrites': False,
         }],
         'outtmpl': output_template,
         'quiet': False,
         'no_warnings': False,
-        'extract_flat': False,
         'socket_timeout': 60,
         'postprocessor_args': [
             '-ar', '44100',
             '-ac', '1',
-            '-b:a', '128k',
-            '-q:a', '4',
+            '-b:a', '96k',
         ],
         'prefer_ffmpeg': True,
         'keepvideo': False,
-        'progress_hooks': [],
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept-Language': 'en-US,en;q=0.9',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
         },
-        # ✅ FIXED: Use multiple player clients as fallback
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['web', 'android'],  # Try web first, then android
-                'player_skip': ['js'],  # Skip JS player
-                'bypass_login': True,
-            }
-        },
-        'retries': 15,
-        'fragment_retries': 15,
+        # ✅ SIMPLIFIED: Remove problematic extractor_args
+        'retries': 5,
+        'fragment_retries': 5,
         'skip_unavailable_fragments': True,
         'ignore_errors': False,
         'no_check_certificate': True,
-        # ✅ NEW: Allow unplayable formats as fallback
-        'allow_unplayable_formats': True,
+        # ✅ REMOVED: 'allow_unplayable_formats': True,
     }
     
     try:
@@ -110,7 +96,6 @@ async def download_audio_from_url(url: str, task_id: int) -> Tuple[str, str, int
                 info = ydl.extract_info(url, download=True)
                 return info
         
-        # Run in executor to avoid blocking
         info = await loop.run_in_executor(None, download)
         
         if info is None:
@@ -121,29 +106,18 @@ async def download_audio_from_url(url: str, task_id: int) -> Tuple[str, str, int
         
         logger.info(f"📺 Title: {title}, Duration: {duration}s")
         
-        # Find the downloaded file (handle Chinese characters in filename)
         import glob
         pattern = os.path.join(YT_DOWNLOAD_DIR, f"yt_{task_id}_*.mp3")
         files = glob.glob(pattern)
         
         if not files:
-            # If no mp3 found, look for any audio file
             pattern = os.path.join(YT_DOWNLOAD_DIR, f"yt_{task_id}_*")
-            files = glob.glob(pattern)
-            if files:
-                # Filter for audio files only
-                audio_files = [f for f in files if f.endswith(('.mp3', '.m4a', '.wav', '.aac'))]
-                if audio_files:
-                    files = audio_files
+            files = [f for f in glob.glob(pattern) if f.endswith(('.mp3', '.m4a', '.wav'))]
         
         if not files:
-            raise FileNotFoundError(f"Downloaded file not found for pattern: {pattern}")
+            raise FileNotFoundError(f"Downloaded file not found")
         
         file_path = files[0]
-        
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"Downloaded file not found: {file_path}")
-        
         file_size = os.path.getsize(file_path)
         logger.info(f"✅ Downloaded: {file_path} ({file_size/1024/1024:.2f}MB)")
         
@@ -156,19 +130,9 @@ async def download_audio_from_url(url: str, task_id: int) -> Tuple[str, str, int
 def validate_video_url(url: str) -> bool:
     """Check if URL is supported by yt-dlp"""
     try:
-        ydl_opts = {
-            'quiet': True,
-            'no_warnings': True,
-            'extract_flat': True,
-            'socket_timeout': 10,
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-        }
-        
+        ydl_opts = {'quiet': True, 'simulate': True}
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            return info is not None
-    except Exception as e:
-        logger.warning(f"URL validation failed: {e}")
+            ydl.extract_info(url, download=False)
+            return True
+    except:
         return False

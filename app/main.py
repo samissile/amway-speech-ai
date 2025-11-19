@@ -313,7 +313,19 @@ async def process_youtube_url(url: str, summarize: bool, task_id: int):
     try:
         await update_task(task_id, status='downloading', progress=5)
         
-        temp_path, title, duration = await download_audio_from_url(url, task_id)
+        try:
+            temp_path, title, duration = await download_audio_from_url(url, task_id)
+        except ValueError as e:
+            # ✅ NEW: More informative error message
+            error_msg = str(e)
+            if "not available" in error_msg.lower():
+                error_msg = "YouTube 限制了此影片的下載。請稍後重試或嘗試其他影片。"
+            elif "403" in error_msg:
+                error_msg = "存取被拒絕。YouTube 可能已封鎖此請求。"
+            
+            logger.error(f"❌ YouTube task {task_id} failed: {error_msg}")
+            await update_task(task_id, status='error', progress=0, error=error_msg)
+            return
         
         file_size = os.path.getsize(temp_path)
         await update_task(
